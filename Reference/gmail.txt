@@ -1,0 +1,155 @@
+package miniproject;
+
+import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
+import java.awt.*;
+import java.awt.event.*;
+import java.sql.*;
+import java.util.Properties;
+import jakarta.mail.*;
+import jakarta.mail.internet.*;
+
+public class ViewStockFrame extends JFrame {
+    JButton showButton, backButton;
+    JTable stockTable;
+    DefaultTableModel model;
+
+    public ViewStockFrame() {
+        setTitle("View Low Stock Resources");
+        setSize(800, 500);
+        setLayout(new BorderLayout());
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+
+        // Create header panel with light blue background
+        JPanel headerPanel = new JPanel();
+        headerPanel.setBackground(new Color(173, 216, 230)); // Light Blue
+        headerPanel.setLayout(new BorderLayout());
+
+        JLabel titleLabel = new JLabel("View Stock");
+        titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 24));
+        titleLabel.setForeground(Color.BLACK);
+        titleLabel.setHorizontalAlignment(SwingConstants.CENTER);
+        headerPanel.add(titleLabel, BorderLayout.CENTER);
+
+        backButton = new JButton();
+        ImageIcon backIcon = new ImageIcon("C:/Users/aaksh/Downloads/icons8-back-48.png");
+        backButton.setIcon(backIcon);
+        JPanel backButtonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        backButtonPanel.setOpaque(false);
+        backButtonPanel.add(backButton);
+        headerPanel.add(backButtonPanel, BorderLayout.NORTH);
+
+        add(headerPanel, BorderLayout.NORTH);
+
+        model = new DefaultTableModel();
+        stockTable = new JTable(model);
+        JScrollPane scrollPane = new JScrollPane(stockTable);
+        add(scrollPane, BorderLayout.CENTER);
+
+        JPanel bottomPanel = new JPanel();
+        showButton = new JButton();
+        ImageIcon showIcon = new ImageIcon("C:/Users/aaksh/Downloads/icons8-show-96.png");
+        showButton.setIcon(showIcon);
+        bottomPanel.add(showButton);
+        add(bottomPanel, BorderLayout.SOUTH);
+
+        model.addColumn("Resource ID");
+        model.addColumn("Resource Name");
+        model.addColumn("Quantity");
+        model.addColumn("Supplier Name");
+        model.addColumn("Contact");
+        model.addColumn("Error Message");
+        model.addColumn("Order Details");
+
+        backButton.addActionListener(e -> {
+            dispose();
+            ManagerFrame m = new ManagerFrame();
+            m.setVisible(true);
+        });
+
+        showButton.addActionListener(e -> loadData());
+
+        setVisible(true);
+    }
+
+    private void loadData() {
+        model.setRowCount(0); // Clear existing table rows
+        boolean lowStockFound = false; // Flag to check if any low stock present
+
+        try {
+            Class.forName("com.mysql.cj.jdbc.Driver");
+            Connection con = DriverManager.getConnection(
+                "jdbc:mysql://localhost:3306/SKFARTS", "root", "Harini@05"
+            );
+
+            CallableStatement cs = con.prepareCall("{CALL GetLowStockResources()}");
+            ResultSet rs = cs.executeQuery();
+
+            while (rs.next()) {
+                model.addRow(new Object[] {
+                    rs.getInt("rid"),
+                    rs.getString("rname"),
+                    rs.getInt("rquantity"),
+                    rs.getString("sname"),
+                    rs.getString("contact"),
+                    rs.getString("error_message"),
+                    rs.getString("order_details")
+                });
+                lowStockFound = true; // Found at least one low stock
+            }
+
+            rs.close();
+            cs.close();
+            con.close();
+
+            // After loading data, if low stock found, send email
+            if (lowStockFound) {
+                sendEmailNotification();
+            }
+
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, "Error: " + ex.getMessage());
+            ex.printStackTrace();
+        }
+    }
+
+    private void sendEmailNotification() {
+        final String fromEmail = "your_email@gmail.com"; // Replace with your email
+        final String password = "your_app_password";     // Replace with your app password
+        final String toEmail = "manager_email@example.com"; // Manager's email
+
+        Properties props = new Properties();
+        props.put("mail.smtp.host", "smtp.gmail.com");
+        props.put("mail.smtp.port", "587");
+        props.put("mail.smtp.auth", "true");
+        props.put("mail.smtp.starttls.enable", "true");
+
+        Session session = Session.getInstance(props, new Authenticator() {
+            protected PasswordAuthentication getPasswordAuthentication() {
+                return new PasswordAuthentication(fromEmail, password);
+            }
+        });
+
+        try {
+            Message message = new MimeMessage(session);
+            message.setFrom(new InternetAddress(fromEmail));
+            message.setRecipients(
+                    Message.RecipientType.TO,
+                    InternetAddress.parse(toEmail)
+            );
+            message.setSubject("Low Stock Alert - SKF ARTS Resources");
+            message.setText("Some resources have low stock. Please log into the system and review the details.");
+
+            Transport.send(message);
+
+            JOptionPane.showMessageDialog(this, "Low stock found. Email sent to Manager!");
+        } catch (MessagingException e) {
+            JOptionPane.showMessageDialog(this, "Failed to send Email: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    public static void main(String[] args) {
+        new ViewStockFrame();
+    }
+}

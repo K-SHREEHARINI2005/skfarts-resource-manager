@@ -1,0 +1,262 @@
+1.Create a trigger that automatically calculates and updates the FineAmount in the 
+Borrowings table when the ReturnDate is set, based on the number of overdue days.
+SQL> CREATE OR REPLACE TRIGGER update_fine
+  2  BEFORE UPDATE OF returndate ON borrowings1
+  3  FOR EACH ROW
+  4  DECLARE
+  5      overduedays NUMBER;
+  6      fine NUMBER := 5;
+  7  BEGIN
+  8      IF :NEW.returndate IS NOT NULL THEN
+  9          overduedays := :NEW.returndate - :OLD.duedate;
+ 10          IF overduedays > 0 THEN
+ 11              :NEW.FineAmount := overduedays * fine;
+ 12          ELSE
+ 13              :NEW.FineAmount := 0;
+ 14          END IF;
+ 15      END IF;
+ 16  END;
+ 17  /
+
+Trigger created.
+
+SQL> select * from borrowings1;
+
+  BORROWID   MEMBERID     BOOKID BORROWDAT DUEDATE   RETURNDAT FINEAMOUNT
+---------- ---------- ---------- --------- --------- --------- ----------
+         1        101          7 01-MAR-24 15-MAR-24 14-MAR-24          0
+         2        102          8 20-FEB-24 05-MAR-24 07-MAR-24          5
+         3        104          9 10-MAR-24 25-MAR-24
+         4        105         10 15-JAN-24 30-JAN-24 02-FEB-24         10
+         5        106          7 28-FEB-24 14-MAR-24 15-MAR-24        2.5
+         6        107          8 05-MAR-24 20-MAR-24 22-MAR-24          5
+         7        108          9 18-FEB-24 04-MAR-24 04-MAR-24          0
+         8        109         10 08-MAR-24 23-MAR-24
+         9        110          7 25-FEB-24 12-MAR-24 13-MAR-24          2
+        10        101          8 10-JAN-24 25-JAN-24 28-JAN-24          8
+        11        101          5 03-APR-25 17-APR-25
+
+11 rows selected.
+
+
+SQL> UPDATE borrowings1
+  2  SET returndate = TO_DATE('20-APR-25', 'DD-MON-YY')
+  3  WHERE borrowid = 11;
+UPDATE borrowings1
+       *
+ERROR at line 1:
+ORA-04091: table SYSTEM.BORROWINGS1 is mutating, trigger/function may not see
+it
+ORA-06512: at "SYSTEM.TRG_CALCULATE_FINE", line 7
+ORA-04088: error during execution of trigger 'SYSTEM.TRG_CALCULATE_FINE'
+SQL> COMMIT;
+Commit complete.
+SQL> UPDATE borrowings1
+  2  SET returndate = TO_DATE('2025-04-05', 'YYYY-MM-DD')
+  3  WHERE borrowid = 1;
+1 row updated.
+SQL> COMMIT;
+Commit complete.
+SQL> select * from borrowings1;
+
+  BORROWID   MEMBERID     BOOKID BORROWDAT DUEDATE   RETURNDAT FINEAMOUNT
+---------- ---------- ---------- --------- --------- --------- ----------
+         1        101          7 01-MAR-24 15-MAR-24 05-APR-25       1930
+         2        102          8 20-FEB-24 05-MAR-24 07-MAR-24          5
+         3        104          9 10-MAR-24 25-MAR-24
+         4        105         10 15-JAN-24 30-JAN-24 02-FEB-24         10
+         5        106          7 28-FEB-24 14-MAR-24 15-MAR-24        2.5
+         6        107          8 05-MAR-24 20-MAR-24 22-MAR-24          5
+         7        108          9 18-FEB-24 04-MAR-24 04-MAR-24          0
+         8        109         10 08-MAR-24 23-MAR-24
+         9        110          7 25-FEB-24 12-MAR-24 13-MAR-24          2
+        10        101          8 10-JAN-24 25-JAN-24 28-JAN-24          8
+        11        101          5 03-APR-25 17-APR-25 20-APR-25      10.33
+
+11 rows selected.
+
+
+2.Write a trigger to send an alert or update the Books table when a book’s CopiesAvailable reaches zero.
+SQL> CREATE OR REPLACE TRIGGER update_book
+  2  AFTER UPDATE OF CopiesAvailable ON books1
+  3  FOR EACH ROW
+  4  BEGIN
+  5      IF :NEW.CopiesAvailable = 0 THEN
+  6          DBMS_OUTPUT.PUT_LINE('THE BOOK IS OUT OF STOCK');
+  7      END IF;
+  8  END;
+  9  /
+
+Trigger created.
+SQL>  UPDATE BOOKS1 SET COPIESAVAILABLE=0 WHERE BOOKiD=6;
+1 row updated.
+SQL> set serveroutput on;
+SQL>  UPDATE BOOKS1 SET COPIESAVAILABLE=0 WHERE BOOKiD=5;
+THE BOOK IS OUT OF STOCK
+1 row updated.
+SQL> select * from books1;
+
+    BOOKID TITLE        AUTHORID PUBLISHERID        ISBN       YEAR CATEGORYID  COPIESAVAILABLE
+---------- ---------- ---------- ----------- -----------    ------- ---------- ---------------
+         4 IT                  4           5 97804504119       1986          4                4
+
+         5 Murder              5           2 97800071192       1934          5                0
+
+         6 DaVinci             6           6 97803855042       2003          6                0
+
+
+3.Write a PL/SQL trigger to prevent the member from borrowing a book if he/she have any unpaid late fees in the LateFee table.
+SQL> CREATE OR REPLACE TRIGGER unpaid_fee
+  2  BEFORE INSERT ON borrowings1
+  3  FOR EACH ROW
+  4  DECLARE
+  5      fee INT;
+  6  BEGIN
+  7      SELECT COUNT(*) INTO fee
+  8      FROM latefees1
+  9      WHERE memberid = :NEW.memberid AND amount > 0;
+ 10
+ 11      IF fee > 0 THEN
+ 12          RAISE_APPLICATION_ERROR(-20001, 'Member cannot borrow books due to unpaid fees.');
+ 13
+ 14      END IF;
+ 15  END;
+ 16  /
+
+Trigger created.
+
+SQL> select * from borrowings1;
+  BORROWID   MEMBERID     BOOKID BORROWDAT DUEDATE   RETURNDAT FINEAMOUNT
+---------- ---------- ---------- --------- --------- --------- ----------
+         1        101          7 01-MAR-24 15-MAR-24 05-APR-25       1930
+         2        102          8 20-FEB-24 05-MAR-24 07-MAR-24          5
+         3        104          9 10-MAR-24 25-MAR-24
+         4        105         10 15-JAN-24 30-JAN-24 02-FEB-24         10
+         5        106          7 28-FEB-24 14-MAR-24 15-MAR-24        2.5
+         6        107          8 05-MAR-24 20-MAR-24 22-MAR-24          5
+6 rows selected.
+
+
+SQL> INSERT INTO borrowings1 (BorrowID, MemberID, BookID, BorrowDate, DueDate)
+  2  VALUES (7, 108, 9, SYSDATE, SYSDATE + 14);
+INSERT INTO borrowings1 (BorrowID, MemberID, BookID, BorrowDate, DueDate)
+            *
+ERROR at line 1:
+ORA-20001: Member cannot borrow books due to unpaid fees.
+ORA-06512: at "SYSTEM.UNPAID_FEE", line 9
+ORA-04088: error during execution of trigger 'SYSTEM.UNPAID_FEE'
+
+
+SQL>
+SQL> INSERT INTO borrowings1 (BorrowID, MemberID, BookID, BorrowDate, DueDate)
+  2  VALUES (10, 101, 8, SYSDATE, SYSDATE + 14);
+
+1 row created.
+SQL> select * from borrowings1;
+
+  BORROWID   MEMBERID     BOOKID BORROWDAT DUEDATE   RETURNDAT FINEAMOUNT
+---------- ---------- ---------- --------- --------- --------- ----------
+         1        101          7 01-MAR-24 15-MAR-24 05-APR-25       1930
+         2        102          8 20-FEB-24 05-MAR-24 07-MAR-24          5
+         3        104          9 10-MAR-24 25-MAR-24
+         4        105         10 15-JAN-24 30-JAN-24 02-FEB-24         10
+         5        106          7 28-FEB-24 14-MAR-24 15-MAR-24        2.5
+         6        107          8 05-MAR-24 20-MAR-24 22-MAR-24          5
+        10        101          8 07-APR-25 21-APR-25
+
+7 rows selected.
+
+4.Write a trigger that checks if a member has reached their borrowing limit before allowing them to borrow more books.
+SQL> CREATE OR REPLACE TRIGGER chk_borrowlimit
+  2  BEFORE INSERT ON borrowings1
+  3  FOR EACH ROW
+  4  DECLARE
+  5          cur_borrow INT;
+  6  BEGIN
+  7      SELECT COUNT(*) INTO cur_borrow
+  8      FROM borrowings1
+  9      WHERE memberid = :NEW.memberid AND returndate IS NULL;
+ 10
+ 11      IF cur_borrow >= 5 THEN
+ 12          RAISE_APPLICATION_ERROR(-20001, 'Member has reached the borrow limit of 5.');
+ 13      END IF;
+ 14  END;
+ 15  /
+
+Trigger created.
+
+
+SQL> set serveroutput on
+SQL> INSERT INTO borrowings1 (borrowid, memberid, bookid, borrowdate, duedate, returndate, fineamount)
+  2  VALUES (36, 36, 36, TO_DATE('07-APR-2025','DD-MON-YYYY'), TO_DATE('21-APR-2025','DD-MON-YYYY'), NULL, 0.0);
+
+1 row created.
+
+SQL> INSERT INTO borrowings1 (borrowid, memberid, bookid, borrowdate, duedate, returndate, fineamount)
+  2  VALUES (32, 36, 32, TO_DATE('01-MAR-2025','DD-MON-YYYY'), TO_DATE('15-MAR-2025','DD-MON-YYYY'), NULL, 0.0);
+
+1 row created.
+SQL> INSERT INTO borrowings1 (borrowid, memberid, bookid, borrowdate, duedate, returndate, fineamount)
+  2  VALUES (35, 36, 35, TO_DATE('06-APR-2025','DD-MON-YYYY'), TO_DATE('20-APR-2025','DD-MON-YYYY'), NULL, 0.0);
+1 row created.
+SQL> INSERT INTO borrowings1 (borrowid, memberid, bookid, borrowdate, duedate, returndate, fineamount)
+  2  VALUES (34, 36, 34, TO_DATE('05-APR-2025','DD-MON-YYYY'), TO_DATE('20-APR-2025','DD-MON-YYYY'), NULL, 0.0);
+1 row created.
+SQL>
+SQL> INSERT INTO borrowings1 (borrowid, memberid, bookid, borrowdate, duedate, returndate, fineamount)
+  2  VALUES (33, 36, 33, TO_DATE('10-MAR-2025','DD-MON-YYYY'), TO_DATE('24-MAR-2025','DD-MON-YYYY'), NULL, 0.0);
+INSERT INTO borrowings1 (borrowid, memberid, bookid, borrowdate, duedate, returndate, fineamount)
+            *
+ERROR at line 1:
+ORA-20001: Member has reached the borrow limit of 5.
+ORA-06512: at "SYSTEM.CHK_BORROWLIMIT", line 9
+ORA-04088: error during execution of trigger 'SYSTEM.CHK_BORROWLIMIT'
+SQL> select * from borrowings1;
+
+  BORROWID   MEMBERID     BOOKID BORROWDAT DUEDATE   RETURNDAT FINEAMOUNT
+---------- ---------- ---------- --------- --------- --------- ----------
+         1        101          7 01-MAR-24 15-MAR-24 05-APR-25       1930
+         2        102          8 20-FEB-24 05-MAR-24 07-MAR-24          5
+         3        104          9 10-MAR-24 25-MAR-24
+         4        105         10 15-JAN-24 30-JAN-24 02-FEB-24         10
+         5        106          7 28-FEB-24 14-MAR-24 15-MAR-24        2.5
+         6        107          8 05-MAR-24 20-MAR-24 22-MAR-24          5
+        10        101          8 07-APR-25 21-APR-25
+        36         36         36 07-APR-25 21-APR-25                    0
+        32         36         32 01-MAR-25 15-MAR-25                    0
+        35         36         35 06-APR-25 20-APR-25                    0
+        34         36         34 05-APR-25 20-APR-25                    0
+
+11 rows selected.
+
+5.Create a trigger that inserts a new record into the Reservations table when a member 
+requests to borrow a book that is currently unavailable.
+3)QL> create sequence my_sequence;
+Sequence created.
+QL>
+SQL>  CREATE OR REPLACE TRIGGER reserve_unavailable
+  2   AFTER INSERT ON borrowings1
+  3   FOR EACH ROW
+  4   DECLARE
+  5       copies INT;
+  6   BEGIN
+  7       SELECT CopiesAvailable INTO copies FROM BOOKS1 WHERE BOOKID = :NID;
+  8       IF copiesAVAILABLE = 0 THEN
+  9           INSERT INTO reservations1
+ 10           VALUES (MY_SEQUENCE.NEXTVAL,:NEW.MEMBERID, :NEW.BOOKID, SYSDATE, 'Reserved', SYSDATE + 30);
+ 11       END IF;
+ 12   END;
+ 13   /
+ Trigger created
+QL>  INSERT INTO BORROWINGS1 VALUES('11','111','11','11-FEB-25','20-FEB-25','18-FEB-25','0')  ;
+1 row created.
+SQL> select * from borrowings1;
+  BORROWID   MEMBERID     BOOKID BORROWDAT DUEDATE   RETURNDAT FINEAMOUNT
+---------- ---------- ---------- --------- --------- --------- ----------
+         1        101          7 01-MAR-24 15-MAR-24 05-APR-25       1930
+         2        102          8 20-FEB-24 05-MAR-24 07-MAR-24          5
+         3        104          9 10-MAR-24 25-MAR-24
+         4        105         10 15-JAN-24 30-JAN-24 02-FEB-24         10
+         5        106          7 28-FEB-24 14-MAR-24 15-MAR-24        2.5
+         6        107          8 05-MAR-24 20-MAR-24 22-MAR-24          5
+        11        111         11 11-FEB-25 20-FEB-25 18-FEB-25          0

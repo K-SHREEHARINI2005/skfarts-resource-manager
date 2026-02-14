@@ -1,0 +1,217 @@
+mysql> create database SKF;
+Query OK, 1 row affected (0.02 sec)
+
+mysql> use SKF;
+Database changed
+mysql> CREATE TABLE designtype (
+    ->     designtypeid INT PRIMARY KEY,
+    ->     typename VARCHAR(20) NOT NULL UNIQUE
+    -> );
+Query OK, 0 rows affected (0.12 sec)
+
+mysql>
+mysql> CREATE TABLE designing (
+    ->     oid INT PRIMARY KEY,
+    ->     softwareused VARCHAR(20) NOT NULL,
+    ->     projectname VARCHAR(20) NOT NULL,
+    ->     creationdate DATE NOT NULL,
+    ->     designtypeid INT NOT NULL,
+    ->     FOREIGN KEY (designtypeid) REFERENCES designtype(designtypeid) ON DELETE CASCADE
+    -> );
+Query OK, 0 rows affected (0.04 sec)
+
+mysql>
+mysql> CREATE TABLE employees (
+    ->     eid INT PRIMARY KEY,
+    ->     ename VARCHAR(15) NOT NULL,
+    ->     employeecontact BIGINT UNIQUE NOT NULL,
+    ->     role VARCHAR(12) NOT NULL
+    -> );
+Query OK, 0 rows affected (0.03 sec)
+
+mysql>
+mysql> CREATE TABLE supplier (
+    ->     sid INT PRIMARY KEY,
+    ->     sname VARCHAR(15) NOT NULL,
+    ->     contact BIGINT UNIQUE NOT NULL,
+    ->     remail VARCHAR(15) UNIQUE NOT NULL,
+    ->     address VARCHAR(20) NOT NULL
+    -> );
+Query OK, 0 rows affected (0.04 sec)
+
+mysql>
+mysql> CREATE TABLE resources (
+    ->     rid INT PRIMARY KEY,
+    ->     rname VARCHAR(15) NOT NULL,
+    ->     rtype VARCHAR(12) NOT NULL,
+    ->     rquantity INT CHECK (rquantity >= 0),
+    ->     unit INT NOT NULL,
+    ->     supplierid INT,
+    ->     FOREIGN KEY (supplierid) REFERENCES supplier(sid) ON DELETE SET NULL
+    -> );
+Query OK, 0 rows affected (0.04 sec)
+
+mysql>
+mysql> CREATE TABLE orders (
+    ->     oid INT PRIMARY KEY,
+    ->     rid INT NOT NULL,
+    ->     sid INT NOT NULL,
+    ->     orderdate DATE NOT NULL,
+    ->     quantity INT CHECK (quantity > 0),
+    ->     deliverydate DATE,
+    ->     FOREIGN KEY (rid) REFERENCES resources(rid) ON DELETE CASCADE,
+    ->     FOREIGN KEY (sid) REFERENCES supplier(sid) ON DELETE CASCADE
+    -> );
+Query OK, 0 rows affected (0.04 sec)
+
+mysql>
+mysql> CREATE TABLE machine (
+    ->     mid INT PRIMARY KEY,
+    ->     name VARCHAR(15) NOT NULL,
+    ->     type VARCHAR(15) NOT NULL,
+    ->     status VARCHAR(12) CHECK (status IN ('Active', 'Inactive', 'Maintenance')),
+    ->     eid INT NULL,
+    ->     FOREIGN KEY (eid) REFERENCES employees(eid) ON DELETE SET NULL
+    -> );
+Query OK, 0 rows affected (0.03 sec)
+
+mysql>
+mysql> CREATE TABLE scoring (
+    ->     oid INT NOT NULL,
+    ->     rid INT NOT NULL,
+    ->     eid INT NOT NULL,
+    ->     scoringdate DATE NOT NULL,
+    ->     outputquantity INT CHECK (outputquantity >= 0),
+    ->     PRIMARY KEY (oid, rid, eid),
+    ->     FOREIGN KEY (oid) REFERENCES orders(oid) ON DELETE CASCADE,
+    ->     FOREIGN KEY (rid) REFERENCES resources(rid) ON DELETE CASCADE,
+    ->     FOREIGN KEY (eid) REFERENCES employees(eid) ON DELETE CASCADE
+    -> );
+Query OK, 0 rows affected (0.04 sec)
+
+mysql>
+mysql> CREATE TABLE laminating (
+    ->     id INT AUTO_INCREMENT PRIMARY KEY,
+    ->     oid INT NOT NULL,
+    ->     rid INT NOT NULL,
+    ->     eid INT NOT NULL,
+    ->     mid INT NULL,
+    ->     laminationdate DATE NOT NULL,
+    ->     outputquantity INT CHECK (outputquantity >= 0),
+    ->     UNIQUE (oid, rid, eid, mid),
+    ->     FOREIGN KEY (oid) REFERENCES orders(oid) ON DELETE CASCADE,
+    ->     FOREIGN KEY (rid) REFERENCES resources(rid) ON DELETE CASCADE,
+    ->     FOREIGN KEY (eid) REFERENCES employees(eid) ON DELETE CASCADE,
+    ->     FOREIGN KEY (mid) REFERENCES machine(mid) ON DELETE SET NULL
+    -> );
+Query OK, 0 rows affected (0.05 sec)
+
+mysql> desc designtype;
++--------------+-------------+------+-----+---------+-------+
+| Field        | Type        | Null | Key | Default | Extra |
++--------------+-------------+------+-----+---------+-------+
+| designtypeid | int         | NO   | PRI | NULL    |       |
+| typename     | varchar(20) | NO   | UNI | NULL    |       |
++--------------+-------------+------+-----+---------+-------+
+2 rows in set (0.03 sec)
+
+mysql> ^C
+mysql> desc designing;
++--------------+-------------+------+-----+---------+-------+
+| Field        | Type        | Null | Key | Default | Extra |
++--------------+-------------+------+-----+---------+-------+
+| oid          | int         | NO   | PRI | NULL    |       |
+| softwareused | varchar(20) | NO   |     | NULL    |       |
+| projectname  | varchar(20) | NO   |     | NULL    |       |
+| creationdate | date        | NO   |     | NULL    |       |
+| designtypeid | int         | NO   | MUL | NULL    |       |
++--------------+-------------+------+-----+---------+-------+
+5 rows in set (0.00 sec)
+
+mysql> ^C
+mysql>  desc employees;
++-----------------+-------------+------+-----+---------+-------+
+| Field           | Type        | Null | Key | Default | Extra |
++-----------------+-------------+------+-----+---------+-------+
+| eid             | int         | NO   | PRI | NULL    |       |
+| ename           | varchar(15) | NO   |     | NULL    |       |
+| employeecontact | bigint      | NO   | UNI | NULL    |       |
+| role            | varchar(12) | NO   |     | NULL    |       |
++-----------------+-------------+------+-----+---------+-------+
+4 rows in set (0.01 sec)
+
+mysql>  desc supplier;
++---------+-------------+------+-----+---------+-------+
+| Field   | Type        | Null | Key | Default | Extra |
++---------+-------------+------+-----+---------+-------+
+| sid     | int         | NO   | PRI | NULL    |       |
+| sname   | varchar(15) | NO   |     | NULL    |       |
+| contact | bigint      | NO   | UNI | NULL    |       |
+| remail  | varchar(15) | NO   | UNI | NULL    |       |
+| address | varchar(20) | NO   |     | NULL    |       |
++---------+-------------+------+-----+---------+-------+
+5 rows in set (0.00 sec)
+
+mysql> desc resources;
++------------+-------------+------+-----+---------+-------+
+| Field      | Type        | Null | Key | Default | Extra |
++------------+-------------+------+-----+---------+-------+
+| rid        | int         | NO   | PRI | NULL    |       |
+| rname      | varchar(15) | NO   |     | NULL    |       |
+| rtype      | varchar(12) | NO   |     | NULL    |       |
+| rquantity  | int         | YES  |     | NULL    |       |
+| unit       | int         | NO   |     | NULL    |       |
+| supplierid | int         | YES  | MUL | NULL    |       |
++------------+-------------+------+-----+---------+-------+
+6 rows in set (0.01 sec)
+
+mysql>  desc orders;
++--------------+------+------+-----+---------+-------+
+| Field        | Type | Null | Key | Default | Extra |
++--------------+------+------+-----+---------+-------+
+| oid          | int  | NO   | PRI | NULL    |       |
+| rid          | int  | NO   | MUL | NULL    |       |
+| sid          | int  | NO   | MUL | NULL    |       |
+| orderdate    | date | NO   |     | NULL    |       |
+| quantity     | int  | YES  |     | NULL    |       |
+| deliverydate | date | YES  |     | NULL    |       |
++--------------+------+------+-----+---------+-------+
+6 rows in set (0.00 sec)
+
+mysql> desc  machine;
++--------+-------------+------+-----+---------+-------+
+| Field  | Type        | Null | Key | Default | Extra |
++--------+-------------+------+-----+---------+-------+
+| mid    | int         | NO   | PRI | NULL    |       |
+| name   | varchar(15) | NO   |     | NULL    |       |
+| type   | varchar(15) | NO   |     | NULL    |       |
+| status | varchar(12) | YES  |     | NULL    |       |
+| eid    | int         | YES  | MUL | NULL    |       |
++--------+-------------+------+-----+---------+-------+
+5 rows in set (0.00 sec)
+
+mysql> desc  scoring;
++----------------+------+------+-----+---------+-------+
+| Field          | Type | Null | Key | Default | Extra |
++----------------+------+------+-----+---------+-------+
+| oid            | int  | NO   | PRI | NULL    |       |
+| rid            | int  | NO   | PRI | NULL    |       |
+| eid            | int  | NO   | PRI | NULL    |       |
+| scoringdate    | date | NO   |     | NULL    |       |
+| outputquantity | int  | YES  |     | NULL    |       |
++----------------+------+------+-----+---------+-------+
+5 rows in set (0.00 sec)
+
+mysql> desc  laminating;
++----------------+------+------+-----+---------+----------------+
+| Field          | Type | Null | Key | Default | Extra          |
++----------------+------+------+-----+---------+----------------+
+| id             | int  | NO   | PRI | NULL    | auto_increment |
+| oid            | int  | NO   | MUL | NULL    |                |
+| rid            | int  | NO   | MUL | NULL    |                |
+| eid            | int  | NO   | MUL | NULL    |                |
+| mid            | int  | YES  | MUL | NULL    |                |
+| laminationdate | date | NO   |     | NULL    |                |
+| outputquantity | int  | YES  |     | NULL    |                |
++----------------+------+------+-----+---------+----------------+
+7 rows in set (0.01 sec)
